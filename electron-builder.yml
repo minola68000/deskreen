@@ -12,6 +12,10 @@ files:
 extraResources:
   - from: out/client-viewer
     to: client-viewer
+  - from: src/main/windowAudioDelay/bin
+    to: window-audio-delay
+    filter:
+      - AudioDelayInject.exe
 asarUnpack:
   - resources/**
 win:

@@ -79,6 +79,9 @@ export default function SettingsOverlay(
 	const { handleClose, isSettingsOpen } = props;
 	const [latestVersion, setLatestVersion] = useState('');
 	const [currentVersion, setCurrentVersion] = useState('');
+	const [delayMs, setDelayMs] = useState('0');
+	const [delayError, setDelayError] = useState('');
+	const delayLoaded = React.useRef(false);
 
 	const { t } = useTranslation();
 
@@ -139,6 +142,30 @@ export default function SettingsOverlay(
 		getCurrentVersion();
 	}, []);
 
+	useEffect(() => {
+		void window.electron.ipcRenderer
+			.invoke(IpcEvents.GetWindowAudioDelayMs)
+			.then((state: { ms: number; error: string }) => {
+				setDelayMs(String(state.ms));
+				setDelayError(state.error || '');
+				delayLoaded.current = true;
+			});
+	}, []);
+
+	useEffect(() => {
+		if (!delayLoaded.current) {
+			return undefined;
+		}
+		const handle = setTimeout(() => {
+			void window.electron.ipcRenderer
+				.invoke(IpcEvents.SetWindowAudioDelayMs, Number(delayMs))
+				.then((state: { ms: number; error: string }) => {
+					setDelayError(state?.error || '');
+				});
+		}, 400);
+		return () => clearTimeout(handle);
+	}, [delayMs]);
+
 	const hasUpdate =
 		latestVersion !== '' &&
 		currentVersion !== '' &&
@@ -181,6 +208,44 @@ export default function SettingsOverlay(
 						label={t('language')}
 						input={<LanguageSelector />}
 					/>
+				</div>
+
+				<div style={{ marginTop: '24px', width: '100%' }}>
+					<Row middle="xs" between="xs">
+						<Col xs={8}>
+							<Text>{t('window-audio-delay-ms')}</Text>
+						</Col>
+						<Col xs={4}>
+							<input
+								type="number"
+								min={0}
+								max={10000}
+								step={10}
+								value={delayMs}
+								aria-label={t('window-audio-delay-ms')}
+								onChange={(
+									event: React.ChangeEvent<HTMLInputElement>,
+								) => {
+									setDelayMs(event.target.value);
+								}}
+								style={{ width: '100%', maxWidth: '140px' }}
+							/>
+						</Col>
+					</Row>
+					<Text className="bp3-text-muted">
+						{t('window-audio-delay-hint')}
+					</Text>
+					{delayError ? (
+						<Text style={{ color: '#c23030' }}>
+							{t(
+								delayError === 'unsupported-platform'
+									? 'window-audio-delay-error-platform'
+									: delayError === 'own-process'
+										? 'window-audio-delay-error-own-process'
+										: 'window-audio-delay-error-helper',
+							)}
+						</Text>
+					) : null}
 				</div>
 
 				<Row

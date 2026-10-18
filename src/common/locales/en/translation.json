@@ -183,5 +183,10 @@
 	"screen-recording-permission-message": "Deskreen requires Screen Recording permission to share your screen. Please go to System Settings > Privacy & Security > Screen Recording and enable access for Deskreen. You may need to restart the app after granting permission.",
 	"screen-recording-permission-restart-reminder": "You must restart the app after granting Screen Recording permission for it to take effect.",
 	"screen-recording-permission-open-settings": "Open System Settings",
-	"screen-recording-permission-restart-app": "Restart App"
+	"screen-recording-permission-restart-app": "Restart App",
+	"window-audio-delay-ms": "Window playback delay (ms)",
+	"window-audio-delay-hint": "Delays local speaker playback of the shared application window by this many milliseconds. 0 turns it off. 32-bit apps and protected processes are skipped.",
+	"window-audio-delay-error-platform": "This delay only works on Windows.",
+	"window-audio-delay-error-helper": "Could not start playback delay. It is unavailable for 32-bit apps and protected processes.",
+	"window-audio-delay-error-own-process": "Deskreen's own window audio cannot be delayed."
 }

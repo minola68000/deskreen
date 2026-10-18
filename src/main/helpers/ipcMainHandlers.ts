@@ -23,8 +23,25 @@ import { store } from '../../common/deskreen-electron-store';
 import DesktopCapturerSourceType from '../../common/DesktopCapturerSourceType';
 import isLinuxWaylandSession from '../utils/isLinuxWaylandSession';
 import { checkScreenRecordingPermission } from './checkScreenRecordingPermission';
+import {
+	getWindowAudioDelayState,
+	installWindowAudioDelayLifecycle,
+	setWindowAudioDelayMs,
+	stopWindowAudioDelay,
+	syncWindowAudioDelay,
+} from '../windowAudioDelay/windowAudioDelayController';
 
 export const initIpcMainHandlers = (mainWindow: BrowserWindow): void => {
+	installWindowAudioDelayLifecycle();
+
+	ipcMain.handle(IpcEvents.GetWindowAudioDelayMs, () => {
+		return getWindowAudioDelayState();
+	});
+
+	ipcMain.handle(IpcEvents.SetWindowAudioDelayMs, (_, value) => {
+		return setWindowAudioDelayMs(Number(value));
+	});
+
 	ipcMain.on('client-changed-language', async (_, newLangCode) => {
 		i18n.changeLanguage(newLangCode);
 		if (store.has(ElectronStoreKeys.AppLanguage)) {
@@ -258,6 +275,7 @@ export const initIpcMainHandlers = (mainWindow: BrowserWindow): void => {
 			getDeskreenGlobal().sharingSessionService.sharingSessions.delete(
 				sessionId,
 			);
+			stopWindowAudioDelay();
 		},
 	);
 
@@ -284,6 +302,7 @@ export const initIpcMainHandlers = (mainWindow: BrowserWindow): void => {
 
 	ipcMain.handle(IpcEvents.DisconnectAllDevices, () => {
 		getDeskreenGlobal().connectedDevicesService.disconnectAllDevices();
+		stopWindowAudioDelay();
 	});
 
 	ipcMain.handle(IpcEvents.AppLanguageChanged, (_, newLang) => {
@@ -393,6 +412,7 @@ export const initIpcMainHandlers = (mainWindow: BrowserWindow): void => {
 			sharingSession.callPeer();
 			sharingSession.setStatus(SharingSessionStatusEnum.SHARING);
 			sharingSessionService.waitingForConnectionSharingSession = null;
+			syncWindowAudioDelay(sharingSession.desktopCapturerSourceID);
 		}
 
 		connectedDevicesService.resetPendingConnectionDevice();
@@ -480,6 +500,8 @@ export const initIpcMainHandlers = (mainWindow: BrowserWindow): void => {
 		sharingSession?.setStatus(SharingSessionStatusEnum.DESTROYED);
 		sharingSession?.destroy();
 		getDeskreenGlobal().sharingSessionService.sharingSessions.delete(id);
+		getDeskreenGlobal().connectedDevicesService.releaseBySharingSessionId(id);
+		stopWindowAudioDelay();
 	});
 
 	ipcMain.handle(IpcEvents.OpenExternalLink, (_, url: string) => {

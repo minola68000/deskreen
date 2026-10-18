@@ -169,5 +169,10 @@
 	"screen-recording-permission-message": "Deskreenは画面を共有するために画面収録の許可が必要です。システム設定 > プライバシーとセキュリティ > 画面収録に移動して、Deskreenのアクセスを有効にしてください。許可を与えた後、アプリを再起動する必要がある場合があります。",
 	"screen-recording-permission-restart-reminder": "画面収録の許可を付与した後、アプリを再起動して反映させる必要があります。",
 	"screen-recording-permission-open-settings": "システム設定を開く",
-	"screen-recording-permission-restart-app": "アプリを再起動"
+	"screen-recording-permission-restart-app": "アプリを再起動",
+	"window-audio-delay-ms": "ウィンドウ再生音の遅延（ミリ秒）",
+	"window-audio-delay-hint": "共有中のアプリウィンドウの再生音を、このPCのスピーカーで指定したミリ秒だけ遅らせます。0でオフです。32ビットのアプリと保護されたプロセスには効きません。",
+	"window-audio-delay-error-platform": "この遅延はWindowsでのみ動きます。",
+	"window-audio-delay-error-helper": "再生音の遅延を開始できませんでした。32ビットのアプリや保護されたプロセスでは使えません。",
+	"window-audio-delay-error-own-process": "Deskreen自身のウィンドウの音は遅らせられません。"
 }
