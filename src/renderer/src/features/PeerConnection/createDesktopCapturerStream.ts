@@ -18,7 +18,6 @@ export default async function createDesktopCapturerStream(
 			);
 			peerConnection.localStream = stream;
 		} else {
-			// when source is app window
 			const stream = await getDesktopSourceStreamBySourceID(sourceID);
 			peerConnection.localStream = stream;
 		}

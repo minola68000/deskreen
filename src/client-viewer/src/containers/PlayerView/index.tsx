@@ -9,6 +9,10 @@ import {
 } from '../../constants/appConstants';
 import { type VideoQualityType } from '../../features/VideoAutoQualityOptimizer/VideoQualityEnum';
 import { togglePlayerFullscreen } from '../../utils/playerFullscreen';
+import {
+	attachInlinePlayback,
+	viewerVideoLayout,
+} from './viewerVideoLayout';
 
 interface PlayerViewProps {
 	isWithControls: boolean;
@@ -55,13 +59,10 @@ function PlayerView(props: PlayerViewProps) {
 		// html5 video mode
 		if (isWithControls && videoRef.current) {
 			if (streamUrl instanceof MediaStream) {
-				videoRef.current.srcObject = streamUrl;
+				attachInlinePlayback(videoRef.current, streamUrl);
 			} else {
 				videoRef.current.src = streamUrl;
 			}
-			videoRef.current.play().catch((error) => {
-				console.error('Error playing video:', error);
-			});
 			return;
 		}
 
@@ -208,6 +209,7 @@ function PlayerView(props: PlayerViewProps) {
 				overflow: 'hidden',
 			}}
 		>
+			<div style={{ position: 'relative', zIndex: 2 }}>
 			<PlayerControlPanel
 				onSwitchChangedCallback={(isEnabled) => setIsWithControls(isEnabled)}
 				isDefaultPlayerTurnedOn={isWithControls}
@@ -224,26 +226,28 @@ function PlayerView(props: PlayerViewProps) {
 				selectedVideoQuality={videoQuality}
 				screenSharingSourceType={screenSharingSourceType}
 			/>
+			</div>
 			<div
 				id="video-container"
 				style={{
-					margin: '0 auto',
-					position: 'relative',
-					flex: 1,
-					width: '100%',
-					height: '100%',
-					minHeight: 0,
-					backgroundColor: 'black',
+					position: 'absolute',
+					top: 0,
+					right: 0,
+					bottom: 0,
+					left: 0,
+					backgroundColor: '#000',
 				}}
 			>
 				<div
 					id={PLAYER_WRAPPER_ID}
 					className="player-wrapper"
 					style={{
-						position: 'relative',
-						width: '100%',
-						height: '100%',
-						backgroundColor: 'black',
+						position: 'absolute',
+						top: 0,
+						right: 0,
+						bottom: 0,
+						left: 0,
+						backgroundColor: '#000',
 					}}
 				>
 					{isWithControls ? (
@@ -252,13 +256,7 @@ function PlayerView(props: PlayerViewProps) {
 							autoPlay
 							playsInline
 							muted
-							className="absolute top-0 left-0 w-full h-full"
-							style={{
-								width: '100%',
-								height: '100%',
-								objectFit: 'contain',
-								backgroundColor: 'black',
-							}}
+							style={viewerVideoLayout}
 						/>
 					) : (
 						<VideoJSPlayer

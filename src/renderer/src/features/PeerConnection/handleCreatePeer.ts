@@ -1,13 +1,26 @@
 // import SimplePeer from 'simple-peer';
 import createDesktopCapturerStream from './createDesktopCapturerStream';
 import handlePeerOnData from './handlePeerOnData';
+import { peerCloseEndsShare } from './hostSessionLifetime';
+import { signalUsesLanAddress } from './lanIceCandidate';
 import NullSimplePeer from './NullSimplePeer';
-// import simplePeerHandleSdpTransform from './simplePeerHandleSdpTransform';
+import { requestVideoKeyframe } from './requestVideoKeyframe';
+import simplePeerHandleSdpTransform from './simplePeerHandleSdpTransform';
+
+let keyframeTimer: ReturnType<typeof setInterval> | undefined;
+
+function videoSender(connection: RTCPeerConnection) {
+	return connection
+		.getSenders()
+		.find((sender) => sender.track?.kind === 'video');
+}
 
 export default function handleCreatePeer(
 	peerConnection: PeerConnection,
 ): Promise<void> {
 	return new Promise((resolve, reject) => {
+		if (keyframeTimer) clearInterval(keyframeTimer);
+
 		// cleanup existing peer before creating new one
 		if (peerConnection.peer !== NullSimplePeer) {
 			try {
@@ -35,7 +48,10 @@ export default function handleCreatePeer(
 			peerConnection,
 			peerConnection.desktopCapturerSourceID,
 		)
-			.then(() => {
+			.then(async () => {
+				const lanIp = await window.electron.ipcRenderer
+					.invoke('get-local-lan-ip')
+					.catch(() => '');
 				// if (peerConnection.peer === NullSimplePeer) {
 				// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 				// @ts-ignore
@@ -44,7 +60,8 @@ export default function handleCreatePeer(
 					// trickle: false,
 					// wrtc: window.api.wrtc,
 					config: { iceServers: [] },
-					// sdpTransform: simplePeerHandleSdpTransform,
+					sdpTransform: (sdp: string) =>
+						simplePeerHandleSdpTransform(sdp, lanIp),
 				});
 				// }
 
@@ -55,6 +72,7 @@ export default function handleCreatePeer(
 
 				peerConnection.peer.on('signal', (data: string) => {
 					// fired when simple peer and webrtc done preparation to start call on peerConnection machine
+					if (!signalUsesLanAddress(data, lanIp)) return;
 					peerConnection.signalsDataToCallUser.push(data);
 				});
 
@@ -62,14 +80,38 @@ export default function handleCreatePeer(
 					handlePeerOnData(peerConnection, data);
 				});
 
-				// ensure cleanup on peer end/error to prevent dangling helper window
+				let mediaConnected = false;
+				let keyframeBusy = false;
+				const pulseKeyframe = () => {
+					if (keyframeBusy) return;
+					const connection = (
+						peerConnection.peer as { _pc?: RTCPeerConnection }
+					)._pc;
+					const sender = connection && videoSender(connection);
+					if (!sender) return;
+					keyframeBusy = true;
+					requestVideoKeyframe(sender)
+						.catch((error) => {
+							console.error('keyframe request failed', error);
+						})
+						.finally(() => {
+							keyframeBusy = false;
+						});
+				};
+				peerConnection.peer.on('connect', () => {
+					mediaConnected = true;
+					if (keyframeTimer) clearInterval(keyframeTimer);
+					pulseKeyframe();
+					keyframeTimer = setInterval(pulseKeyframe, 2000);
+				});
+
 				peerConnection.peer.on('close', () => {
-					peerConnection.selfDestroy();
+					if (keyframeTimer) clearInterval(keyframeTimer);
+					if (peerCloseEndsShare(mediaConnected)) peerConnection.selfDestroy();
 				});
 
 				peerConnection.peer.on('error', (e: Error) => {
 					console.error('peerConnection peer error', e);
-					peerConnection.selfDestroy();
 				});
 				resolve(undefined);
 			})

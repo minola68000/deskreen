@@ -18,12 +18,12 @@ import handleSetVideoQuality from './handleSetVideoQuality';
 import { DUMMY_MY_DEVICE_DETAILS } from '../../constants/appConstants';
 import handleNoConnectionTimeout from './handleNoConnectionTimeout';
 import handleCreatePeerConnection from './handleCreatePeerConnection';
-import handleRemoveDanglingReactRevealContainer from './handleRemoveDanglingReactRevealContainer';
 import handleDisplayingLoadingSharingIconLoop from './handleDisplayingLoadingSharingIconLoop';
 import { ScreenSharingSource } from '../../features/PeerConnection/ScreenSharingSourceEnum';
 import ConnectionIcon from './ConnectionIconEnum';
 import { LoadingSharingIconEnum } from './LoadingSharingIconEnum';
 import { useScreenViewingTracker } from './useScreenViewingTracker';
+import { shouldUseNativeVideoPlayer } from '../../utils/shouldUseNativeVideoPlayer';
 
 function MainView() {
 	const [isErrorDialogOpen, setIsErrorDialogOpen] = useState(false);
@@ -41,7 +41,13 @@ function MainView() {
 	const [url, setUrl] = useState<MediaStream | null>(null);
 	const [screenSharingSourceType, setScreenSharingSourceType] =
 		useState<ScreenSharingSourceType>(ScreenSharingSource.SCREEN);
-	const [isWithControls, setIsWithControls] = useState(!screenfull.isEnabled);
+	const [isWithControls, setIsWithControls] = useState(
+		() =>
+			shouldUseNativeVideoPlayer(
+				window.navigator.userAgent,
+				window.navigator.maxTouchPoints,
+			) || !screenfull.isEnabled,
+	);
 	const [isShownTextPrompt, setIsShownTextPrompt] = useState(false);
 	const [isShownLoadingSharingIcon, setIsShownLoadingSharingIcon] =
 		useState(false);
@@ -96,7 +102,6 @@ function MainView() {
 		setPlaying(!playing);
 	}, [playing]);
 
-	useEffect(handleRemoveDanglingReactRevealContainer(url), [url]);
 
 	useEffect(
 		handleDisplayingLoadingSharingIconLoop({
@@ -119,14 +124,16 @@ function MainView() {
 
 	return (
 		<Grid>
-			<ConnectionPropmpts
-				myDeviceDetails={myDeviceDetails}
-				isShownTextPrompt={isShownTextPrompt}
-				promptStep={promptStep}
-				connectionIconType={connectionIconType}
-				spinnerIconType={loadingSharingIconType}
-				isShownSpinnerIcon={isShownLoadingSharingIcon}
-			/>
+			{url ? null : (
+				<ConnectionPropmpts
+					myDeviceDetails={myDeviceDetails}
+					isShownTextPrompt={isShownTextPrompt}
+					promptStep={promptStep}
+					connectionIconType={connectionIconType}
+					spinnerIconType={loadingSharingIconType}
+					isShownSpinnerIcon={isShownLoadingSharingIcon}
+				/>
+			)}
 			<PlayerView
 				streamUrl={url}
 				screenSharingSourceType={screenSharingSourceType}

@@ -1,7 +1,10 @@
+import { sdpKeepingLanCandidates } from './lanIceCandidate';
 import setSdpMediaBitrate from './setSdpMediaBitrate';
+import { preferIpadH264 } from './preferVideoCodec';
 
-export default (sdp: string): string => {
-	let newSDP = sdp;
-	newSDP = setSdpMediaBitrate(newSDP, 'video', 500000);
-	return newSDP;
+export default (sdp: string, lanIp = ''): string => {
+	return sdpKeepingLanCandidates(
+		setSdpMediaBitrate(preferIpadH264(sdp), 'video', 500000),
+		lanIp,
+	);
 };

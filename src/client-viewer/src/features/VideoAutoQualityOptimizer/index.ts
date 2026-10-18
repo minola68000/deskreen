@@ -1,4 +1,5 @@
 import { COMPARISON_CANVAS_ID } from './../../constants/appConstants';
+import { videoFrameSamplingPausesPlayback } from './videoFrameSamplingPausesPlayback';
 import pixelmatch from 'pixelmatch';
 import { PLAYER_WRAPPER_ID } from '../../constants/appConstants';
 import CanvasNotDefinedError from './errors/CanvasNotDefinedError';
@@ -37,6 +38,10 @@ export default class VideoAutoQualityOptimizer {
 	}
 
 	startOptimizationLoop() {
+		const userAgent = globalThis.navigator?.userAgent ?? '';
+		const maxTouchPoints = globalThis.navigator?.maxTouchPoints ?? 0;
+		if (videoFrameSamplingPausesPlayback(userAgent, maxTouchPoints)) return;
+
 		this.prepareCanvasAndVideo();
 		setInterval(() => {
 			try {

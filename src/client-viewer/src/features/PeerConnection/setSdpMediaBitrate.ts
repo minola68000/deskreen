@@ -6,20 +6,20 @@ export default (sdp: string, mediaType: string, bitrate: number) => {
 	const bitrateLine = `b=AS:${bitrate}`;
 	mediaLineIndex = sdpLines.findIndex((line) => line.startsWith(mediaLine));
 
-	// If we find a line matching “m={mediaType}”
-	if (mediaLineIndex && mediaLineIndex < sdpLines.length) {
-		// Skip the media line
+	if (mediaLineIndex >= 0 && mediaLineIndex < sdpLines.length) {
 		bitrateLineIndex = mediaLineIndex + 1;
 
-		// Skip both i=* and c=* lines (bandwidths limiters have to come afterwards)
 		while (
-			sdpLines[bitrateLineIndex].startsWith('i=') ||
-			sdpLines[bitrateLineIndex].startsWith('c=')
+			bitrateLineIndex < sdpLines.length &&
+			(sdpLines[bitrateLineIndex].startsWith('i=') ||
+				sdpLines[bitrateLineIndex].startsWith('c='))
 		) {
 			bitrateLineIndex += 1;
 		}
 
-		if (sdpLines[bitrateLineIndex].startsWith('b=')) {
+		if (bitrateLineIndex >= sdpLines.length) {
+			sdpLines.push(bitrateLine);
+		} else if (sdpLines[bitrateLineIndex].startsWith('b=')) {
 			// If the next line is a b=* line, replace it with our new bandwidth
 			sdpLines[bitrateLineIndex] = bitrateLine;
 		} else {

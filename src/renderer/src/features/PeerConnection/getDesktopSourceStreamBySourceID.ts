@@ -1,3 +1,5 @@
+import { viewerSafeCaptureSize } from './viewerSafeCaptureSize';
+
 async function getStreamWithSource(
 	chromeMediaSource: 'desktop' | 'screen',
 	sourceID: string,
@@ -8,6 +10,15 @@ async function getStreamWithSource(
 	minFrameRate: number,
 	maxFrameRate: number,
 ): Promise<MediaStream> {
+	const maxSize = viewerSafeCaptureSize(
+		width ? width * maxSizeMultiplier : undefined,
+		height ? height * maxSizeMultiplier : undefined,
+	);
+	const minSize =
+		width && height
+			? viewerSafeCaptureSize(width * minSizeMultiplier, height * minSizeMultiplier)
+			: maxSize;
+
 	if (width && height) {
 		return navigator.mediaDevices.getUserMedia({
 			audio: false,
@@ -16,10 +27,10 @@ async function getStreamWithSource(
 				mandatory: {
 					chromeMediaSource,
 					chromeMediaSourceId: sourceID,
-					minWidth: width * minSizeMultiplier,
-					maxWidth: width * maxSizeMultiplier,
-					minHeight: height * minSizeMultiplier,
-					maxHeight: height * maxSizeMultiplier,
+					minWidth: Math.min(minSize.width, maxSize.width),
+					maxWidth: maxSize.width,
+					minHeight: Math.min(minSize.height, maxSize.height),
+					maxHeight: maxSize.height,
 					minFrameRate,
 					maxFrameRate,
 				},
@@ -34,6 +45,8 @@ async function getStreamWithSource(
 			mandatory: {
 				chromeMediaSource,
 				chromeMediaSourceId: sourceID,
+				maxWidth: maxSize.width,
+				maxHeight: maxSize.height,
 				minFrameRate,
 				maxFrameRate,
 			},
@@ -48,7 +61,7 @@ export default async (
 	minSizeMultiplier = 1,
 	maxSizeMultiplier = 1,
 	minFrameRate = 15,
-	maxFrameRate = 60,
+	maxFrameRate = 30,
 ): Promise<MediaStream> => {
 	try {
 		return await getStreamWithSource(

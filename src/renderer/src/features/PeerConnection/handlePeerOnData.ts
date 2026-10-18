@@ -27,8 +27,8 @@ export default async function handlePeerOnData(
 			peerConnection.sourceDisplaySize?.height,
 			minVideoQualityMultiplier,
 			maxVideoQualityMultiplier,
-			60,
-			60,
+			30,
+			30,
 		);
 		const newVideoTrack = newStream.getVideoTracks()[0];
 		const oldStream = peerConnection.localStream;
