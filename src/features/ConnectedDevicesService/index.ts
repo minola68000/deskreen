@@ -110,6 +110,13 @@ export class ConnectedDevicesService {
 		this.notifyAvailabilityListeners();
 	}
 
+	releaseBySharingSessionId(sessionId: string): void {
+		const current = this.slot.snapshot()[0];
+		if (!current || current.sharingSessionID !== sessionId) return;
+		this.slot.release();
+		this.notifyAvailabilityListeners();
+	}
+
 	setPendingConnectionDevice(device: Device): void {
 		this.pendingConnectionDevice = device;
 	}

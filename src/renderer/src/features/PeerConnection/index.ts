@@ -258,6 +258,11 @@ export default class PeerConnection {
 		handleSelfDestroy(this);
 	}
 
+	leaveRoom(): void {
+		this.socket.removeAllListeners();
+		this.socket.disconnect();
+	}
+
 	emitUserEnter(): void {
 		this.socket.emit('USER_ENTER', {
 			username: this.user.username,

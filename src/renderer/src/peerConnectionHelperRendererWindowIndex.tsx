@@ -8,6 +8,7 @@ startConsoleRateLimiting();
 
 import { IpcEvents } from '../../common/IpcEvents.enum';
 import PeerConnection from './features/PeerConnection';
+import { hostSocketAction } from './features/PeerConnection/hostSessionLifetime';
 
 const loadDevelopmentText = (): void => {
 	const root = document.getElementById('root');
@@ -31,17 +32,24 @@ const loadDevelopmentText = (): void => {
 };
 
 export function handleIpcRenderer(): void {
+	let started = false;
 	window.electron.ipcRenderer.on('start-peer-connection', () => {
+		if (started) return;
+		started = true;
 		let peerConnection: PeerConnection | undefined;
 
 		window.electron.ipcRenderer.on(
 			'create-peer-connection-with-data',
 			async (_, data) => {
-				// cleanup existing peer connection before creating new one
-				if (peerConnection) {
-					peerConnection.selfDestroy();
-					peerConnection = undefined;
+				const action = hostSocketAction(
+					Boolean(peerConnection),
+					Boolean(peerConnection?.socket.connected),
+				);
+				if (action === 'enter') {
+					peerConnection?.emitUserEnter();
+					return;
 				}
+				if (action === 'wait') return;
 
 				const port = await window.electron.ipcRenderer.invoke(
 					IpcEvents.GetPort,

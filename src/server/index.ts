@@ -9,7 +9,6 @@ import Koa from 'koa';
 import crypto from 'crypto';
 import { Server } from 'socket.io';
 import cors from 'kcors';
-import Router from 'koa-router';
 import koaStatic from 'koa-static';
 import koaSend from 'koa-send';
 import detectPort from 'detect-port';
@@ -23,6 +22,8 @@ import getStore from './store';
 import { getDeskreenGlobal } from '../main/helpers/getDeskreenGlobal';
 import getMyLocalIpV4 from '../main/helpers/getMyLocalIpV4';
 import { getClientViewerDistPath } from './getClientViewerDistPath';
+import { viewerEntryRedirect } from './viewerEntryRedirect';
+import { roomIdFromQuery } from './roomAdmission';
 
 const { hostname, primaryPort, backupPort } = config;
 
@@ -31,10 +32,10 @@ const getRoomIdHash = (id: string): string => {
 };
 
 const ioHandleOnConnection = (socket): void => {
-	const { roomId } = socket.handshake.query;
+	const roomId = roomIdFromQuery(socket.handshake.query?.roomId);
 	const store = getStore();
 
-	setTimeout(async () => {
+	void (async () => {
 		if (!getDeskreenGlobal().roomIDService.isRoomIDTaken(roomId)) {
 			socket.emit('NOT_ALLOWED');
 			setTimeout(() => {
@@ -54,8 +55,7 @@ const ioHandleOnConnection = (socket): void => {
 			socket,
 			room: parsedRoom as Room,
 		});
-		// }
-	}, 500); // timeout 500 millisecond for throttling malicious connections
+	})();
 };
 
 function setStaticFileHeaders(
@@ -110,10 +110,35 @@ class DeskreenSignalingServer {
 
 	init(): void {
 		this.app = new Koa();
-		const router = new Router();
+
+		this.app.use(async (ctx, next) => {
+			if (ctx.method !== 'GET' && ctx.method !== 'HEAD') {
+				await next();
+				return;
+			}
+			let waitingRoomId: string | undefined;
+			let isRoomTaken: (roomId: string) => boolean = () => false;
+			try {
+				const deskreenGlobal = getDeskreenGlobal();
+				const roomId =
+					deskreenGlobal.sharingSessionService
+						.waitingForConnectionSharingSession?.roomID;
+				if (roomId && deskreenGlobal.roomIDService.isRoomIDTaken(roomId)) {
+					waitingRoomId = roomId;
+				}
+				isRoomTaken = (id) => deskreenGlobal.roomIDService.isRoomIDTaken(id);
+			} catch {
+				waitingRoomId = undefined;
+			}
+			const target = viewerEntryRedirect(ctx.path, waitingRoomId, isRoomTaken);
+			if (target && target !== ctx.path) {
+				ctx.redirect(target);
+				return;
+			}
+			await next();
+		});
 
 		this.app.use(cors());
-		this.app.use(router.routes());
 
 		const clientDistDirectory = this.clientDistDirectory;
 

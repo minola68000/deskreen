@@ -11,6 +11,10 @@ import { join } from 'path';
 import { is, optimizer } from '@electron-toolkit/utils';
 import icon from '../../resources/icon.png?asset';
 import { existsSync } from 'node:fs';
+import {
+	argvWithBrokenWgcDisabled,
+	chromiumFeaturesDisablingBrokenWgc,
+} from './helpers/windowsCaptureSwitches';
 
 // function createWindow(): void {
 //   // Create the browser window.
@@ -302,6 +306,23 @@ export default class DeskreenApp {
 	}
 
 	start(): void {
+		const relaunchArgs = argvWithBrokenWgcDisabled(
+			process.argv,
+			process.platform,
+		);
+		if (relaunchArgs) {
+			app.relaunch({ args: relaunchArgs });
+			app.exit(0);
+			return;
+		}
+
+		const disableBrokenWgc = chromiumFeaturesDisablingBrokenWgc(
+			process.platform,
+		);
+		if (disableBrokenWgc) {
+			app.commandLine.appendSwitch('disable-features', disableBrokenWgc);
+		}
+
 		// ensure only one instance of the app can run
 		const gotTheLock = app.requestSingleInstanceLock();
 

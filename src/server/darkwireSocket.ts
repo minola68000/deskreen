@@ -9,6 +9,16 @@ import Io from 'socket.io';
 import socketsIPService from './socketsIPService';
 import getStore from './store';
 import socketIOServerStore from './store/socketIOServerStore';
+import { socketById } from './socketById';
+import { shouldReannounceHost } from './shouldReannounceHost';
+import { getDeskreenGlobal } from '../main/helpers/getDeskreenGlobal';
+import {
+	isRoomBlockingNewViewer,
+	lockAfterUserLeft,
+	nonOwnerCount,
+	staleViewerSocketIds,
+	usersAfterLeave,
+} from './roomLock';
 
 const LOCALHOST_SOCKET_IP = '127.0.0.1';
 
@@ -21,7 +31,22 @@ interface SocketOPTS {
 
 function isLocalhostSocket(socket: Io.Socket) {
 	const remoteAddress = socket.request.socket.remoteAddress ?? '';
-	return remoteAddress.includes(LOCALHOST_SOCKET_IP);
+	return (
+		remoteAddress.includes(LOCALHOST_SOCKET_IP) ||
+		remoteAddress.includes('::1')
+	);
+}
+
+function reannounceWaitingHost(roomIdOriginal: string): void {
+	try {
+		const session =
+			getDeskreenGlobal().sharingSessionService
+				.waitingForConnectionSharingSession;
+		if (!session || session.roomID !== roomIdOriginal) return;
+		session.reannounceHost();
+	} catch {
+		// globals are absent when this module is loaded outside the app
+	}
 }
 
 export default class Socket implements SocketOPTS {
@@ -40,9 +65,13 @@ export default class Socket implements SocketOPTS {
 		this.socket = socket;
 		this.roomIdOriginal = roomIdOriginal;
 		this.room = room;
-		if (room.isLocked) {
+		if (isRoomBlockingNewViewer(room)) {
 			this.sendRoomLocked();
 			return;
+		}
+		if (room.isLocked) {
+			this.room = { ...room, isLocked: false };
+			void this.saveRoom(this.room);
 		}
 
 		this.init();
@@ -118,13 +147,17 @@ export default class Socket implements SocketOPTS {
 			if (!ownerUser) return;
 			const socketIDToDisconnect = socketsIPService.getSocketIDByIP(payload.ip);
 			if (!socketIDToDisconnect) return;
-
-			this.handleDisconnect(
-				socketIOServerStore.getServer().sockets.sockets[socketIDToDisconnect],
+			const connected = socketById(
+				socketIOServerStore.getServer().sockets.sockets,
+				socketIDToDisconnect,
 			);
+			if (!connected) return;
+
+			this.handleDisconnect(connected);
 		});
 
 		this.socket.on('USER_ENTER', async (payload) => {
+			this.socket.join(this.roomId);
 			let room: Room = (await this.fetchRoom()) as Room;
 			if (_.isEmpty(room)) {
 				room = {
@@ -142,16 +175,29 @@ export default class Socket implements SocketOPTS {
 
 			const isOwnerSocket = isLocalhostSocket(this.socket);
 			if (!isOwnerSocket) {
-				const connectedViewers = (room.users || []).filter((user) => {
-					return !user.isOwner;
-				});
-				if (connectedViewers.length >= 1) {
+				const staleIds = staleViewerSocketIds(room.users);
+				if (staleIds.length > 0) {
+					room = {
+						...room,
+						users: (room.users || []).filter((user) => user.isOwner),
+						isLocked: false,
+					};
+					await this.saveRoom(room);
+					const sockets = socketIOServerStore.getServer().sockets.sockets;
+					for (const socketId of staleIds) {
+						socketById(sockets, socketId)?.disconnect(true);
+					}
+				} else if (nonOwnerCount(room.users) >= 1) {
 					this.socket.emit('NOT_ALLOWED');
 					setTimeout(() => {
 						this.socket.disconnect(true);
 					}, 0);
 					return;
 				}
+			}
+
+			if (shouldReannounceHost(isOwnerSocket, room.users)) {
+				reannounceWaitingHost(this.roomIdOriginal);
 			}
 
 			const newRoom: Room = {
@@ -205,18 +251,19 @@ export default class Socket implements SocketOPTS {
 
 	async handleDisconnect(socket: Io.Socket): Promise<void> {
 		const room: Room = (await this.fetchRoom()) as Room;
+		const listed = (room.users || []).some(
+			(user) => user.socketId === socket.id,
+		);
+		if (!listed) return;
 		const isOwnerUser = !!(room.users || []).find(
 			(u) => u.socketId === socket.id && u.isOwner,
 		);
 
+		const remainingUsers = usersAfterLeave(room.users, socket.id);
 		const newRoom = {
 			...room,
-			users: (room.users || [])
-				.filter((u) => u.socketId !== socket.id)
-				.map((u, index) => ({
-					...u,
-					isOwner: index === 0,
-				})),
+			users: remainingUsers,
+			isLocked: lockAfterUserLeft(remainingUsers, Boolean(room.isLocked)),
 		};
 
 		if (isOwnerUser) {
@@ -235,12 +282,9 @@ export default class Socket implements SocketOPTS {
 	}
 
 	disconnectAllUsers(room: Room): void {
+		const sockets = socketIOServerStore.getServer().sockets.sockets;
 		room.users.forEach((u) => {
-			if (socketIOServerStore.getServer().sockets.sockets[u.socketId]) {
-				socketIOServerStore
-					.getServer()
-					.sockets.sockets[u.socketId].disconnect();
-			}
+			socketById(sockets, u.socketId)?.disconnect();
 		});
 	}
 }

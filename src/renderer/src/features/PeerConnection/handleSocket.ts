@@ -4,8 +4,8 @@ import handleSocketUserExit from './handleSocketUserExit';
 export default function handleSocket(peerConnection: PeerConnection): void {
 	peerConnection.socket.removeAllListeners();
 
-	peerConnection.socket.on('disconnect', () => {
-		peerConnection.selfDestroy();
+	peerConnection.socket.on('disconnect', (reason: string) => {
+		console.error('peerConnection socket disconnect', reason);
 	});
 
 	peerConnection.socket.on('error', (error: Error) => {

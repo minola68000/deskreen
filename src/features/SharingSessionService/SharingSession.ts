@@ -23,6 +23,11 @@ export default class SharingSession {
 	peerConnectionHelperRenderer: BrowserWindow | undefined;
 	onDeviceConnectedCallback: undefined | ((device: Device) => void);
 	desktopCapturerSourceID: string;
+	localUser: LocalPeerUser;
+	helperRendererService: PeerConnectionHelperRendererService;
+	reannounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+	private helperClosedByUs = false;
 
 	constructor(
 		_roomID: string,
@@ -40,37 +45,12 @@ export default class SharingSession {
 		this.statusChangeListeners = [] as SharingSessionStatusChangeListener[];
 		this.desktopCapturerSourceID = '';
 		this.onDeviceConnectedCallback = undefined;
+		this.localUser = user;
+		this.helperRendererService = peerConnectionHelperRendererService;
 
 		if (process.env.RUN_MODE === 'test') return;
 
-		this.peerConnectionHelperRenderer =
-			peerConnectionHelperRendererService.createPeerConnectionHelperRenderer();
-
-		this.peerConnectionHelperRenderer.webContents.on('did-finish-load', () => {
-			// TODO: I need to remove dependency on renderer window, just to facilitate development
-			// TODO: OR I can use a Utility or Child process to handle this. https://electron-vite.org/guide/dev#utility-process-and-child-process
-			// TODO: probably using worker thread is the best option, but it will use the same resources as the main thread. child process is using more resources, but it is more isolated.
-			// TODO: https://github.com/alex8088/electron-vite-worker-example
-			this.peerConnectionHelperRenderer?.webContents.send(
-				'create-peer-connection-with-data',
-				{
-					roomID: this.roomID,
-					sharingSessionID: this.id,
-					user,
-				},
-			);
-		});
-
-		this.peerConnectionHelperRenderer.webContents.on(
-			'ipc-message',
-			(_, channel, data) => {
-				if (channel === 'peer-connected') {
-					if (this.onDeviceConnectedCallback) {
-						this.onDeviceConnectedCallback(data);
-					}
-				}
-			},
-		);
+		this.peerConnectionHelperRenderer = this.createHelperWindow();
 
 		this.statusChangeListeners.push(() => {
 			if (this.status === SharingSessionStatusEnum.CONNECTED) {
@@ -81,7 +61,97 @@ export default class SharingSession {
 		});
 	}
 
+	private helperPayload(): {
+		roomID: string;
+		sharingSessionID: string;
+		user: LocalPeerUser;
+	} {
+		return {
+			roomID: this.roomID,
+			sharingSessionID: this.id,
+			user: this.localUser,
+		};
+	}
+
+	private bindHelper(win: BrowserWindow): void {
+		win.webContents.on('did-finish-load', () => {
+			win.webContents.send(
+				'create-peer-connection-with-data',
+				this.helperPayload(),
+			);
+		});
+
+		win.webContents.on('ipc-message', (_, channel, data) => {
+			if (channel === 'peer-connected' && this.onDeviceConnectedCallback) {
+				this.onDeviceConnectedCallback(data);
+			}
+		});
+	}
+
+	private createHelperWindow(): BrowserWindow {
+		const win = this.helperRendererService.createPeerConnectionHelperRenderer();
+		this.bindHelper(win);
+		win.on('closed', () => {
+			if (this.helperClosedByUs) return;
+			if (this.peerConnectionHelperRenderer !== win) return;
+			this.peerConnectionHelperRenderer = undefined;
+			if (this.reannounceTimer) {
+				clearTimeout(this.reannounceTimer);
+				this.reannounceTimer = null;
+			}
+			this.reannounceHost();
+		});
+		return win;
+	}
+
+	private reannounceAttempts = 0;
+
+	reannounceHost(): void {
+		if (process.env.RUN_MODE === 'test') return;
+
+		const win = this.peerConnectionHelperRenderer;
+		if (!win || win.isDestroyed()) {
+			if (this.reannounceTimer) {
+				clearTimeout(this.reannounceTimer);
+				this.reannounceTimer = null;
+			}
+			this.peerConnectionHelperRenderer = this.createHelperWindow();
+			this.reannounceAttempts = 0;
+			this.reannounceTimer = setTimeout(() => {
+				this.reannounceTimer = null;
+			}, 2000);
+			return;
+		}
+		if (this.reannounceTimer) return;
+		if (win.webContents.isLoading()) {
+			this.reannounceAttempts += 1;
+			if (this.reannounceAttempts > 8) {
+				this.reannounceAttempts = 0;
+				return;
+			}
+			this.reannounceTimer = setTimeout(() => {
+				this.reannounceTimer = null;
+				this.reannounceHost();
+			}, 400);
+			return;
+		}
+		this.reannounceAttempts = 0;
+		this.reannounceTimer = setTimeout(() => {
+			this.reannounceTimer = null;
+		}, 2000);
+		win.webContents.send('start-peer-connection');
+		win.webContents.send(
+			'create-peer-connection-with-data',
+			this.helperPayload(),
+		);
+	}
+
 	destroy(): void {
+		this.helperClosedByUs = true;
+		if (this.reannounceTimer) {
+			clearTimeout(this.reannounceTimer);
+			this.reannounceTimer = null;
+		}
 		this.peerConnectionHelperRenderer?.close();
 	}
 
