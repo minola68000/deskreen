@@ -102,6 +102,14 @@ function MainView() {
 		setPlaying(!playing);
 	}, [playing]);
 
+	const sendViewerKey = useCallback((message: string) => {
+		try {
+			peer?.peer?.send(message);
+		} catch (error) {
+			console.error(error);
+		}
+	}, [peer]);
+
 
 	useEffect(
 		handleDisplayingLoadingSharingIconLoop({
@@ -144,6 +152,7 @@ function MainView() {
 				setPlaying={setPlaying}
 				setVideoQuality={setVideoQuality}
 				videoQuality={videoQuality}
+				onViewerKey={sendViewerKey}
 			/>
 			<ErrorDialog
 				errorMessage={dialogErrorMessage}

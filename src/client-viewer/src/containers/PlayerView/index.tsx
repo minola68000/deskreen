@@ -13,6 +13,13 @@ import {
 	attachInlinePlayback,
 	viewerVideoLayout,
 } from './viewerVideoLayout';
+import {
+	keysFromBeforeInput,
+	keysFromKeyboard,
+	repeatedText,
+	viewerKeyMessage,
+	type ViewerKeyPayload,
+} from '../../../../common/viewerKeyInput';
 
 interface PlayerViewProps {
 	isWithControls: boolean;
@@ -24,6 +31,7 @@ interface PlayerViewProps {
 	videoQuality: VideoQualityType;
 	screenSharingSourceType: ScreenSharingSourceType;
 	streamUrl: MediaStream | null;
+	onViewerKey: (message: string) => void;
 }
 
 type IOSVideoElement = HTMLVideoElement & {
@@ -45,7 +53,9 @@ function PlayerView(props: PlayerViewProps) {
 		setVideoQuality,
 		videoQuality,
 		streamUrl,
+		onViewerKey,
 	} = props;
+	const keyInputRef = useRef<HTMLTextAreaElement>(null);
 
 	// const player = useRef(null);
 
@@ -194,6 +204,110 @@ function PlayerView(props: PlayerViewProps) {
 		};
 	}, [streamUrl, isWithControls, isPlaying, setPlaying, t]);
 
+	useEffect(() => {
+		const input = keyInputRef.current;
+		if (!input || !streamUrl) return;
+		let lastText = '';
+		let lastAt = 0;
+		let lastSpaceAt = 0;
+		let composing = false;
+		const held = new Set<string>();
+		const send = (payload: ViewerKeyPayload) => {
+			if (payload.kind === 'text') {
+				const now = Date.now();
+				if (repeatedText(lastText, payload.text, now - lastAt)) return;
+				lastText = payload.text;
+				lastAt = now;
+			}
+			if (payload.kind === 'key' && payload.down && payload.code === 'Space') {
+				lastSpaceAt = Date.now();
+			}
+			onViewerKey(viewerKeyMessage(payload));
+		};
+		const onKey = (type: 'keydown' | 'keyup') => (event: KeyboardEvent) => {
+			const payload = keysFromKeyboard(
+				type,
+				event.key,
+				event.code,
+				{
+					ctrl: event.ctrlKey,
+					alt: event.altKey,
+					meta: event.metaKey,
+					shift: event.shiftKey,
+				},
+				event.keyCode,
+			);
+			if (!payload) return;
+			if (payload.kind === 'key' && payload.down) held.add(payload.code);
+			if (payload.kind === 'key' && !payload.down) held.delete(payload.code);
+			event.preventDefault();
+			event.stopPropagation();
+			send(payload);
+		};
+		const releaseHeld = () => {
+			held.forEach((code) => {
+				send({
+					kind: 'key',
+					down: false,
+					code,
+					ctrl: false,
+					alt: false,
+					shift: false,
+					meta: false,
+				});
+			});
+			held.clear();
+		};
+		const onDown = onKey('keydown');
+		const onUp = onKey('keyup');
+		const onBeforeInput = (event: Event) => {
+			if (composing) return;
+			const inputEvent = event as InputEvent;
+			if (inputEvent.data === ' ' && Date.now() - lastSpaceAt < 80) {
+				inputEvent.preventDefault();
+				return;
+			}
+			const payloads = keysFromBeforeInput(inputEvent.inputType, inputEvent.data);
+			if (payloads.length === 0) return;
+			inputEvent.preventDefault();
+			payloads.forEach(send);
+		};
+		const onCompositionStart = () => {
+			composing = true;
+		};
+		const onCompositionEnd = (event: CompositionEvent) => {
+			composing = false;
+			keysFromBeforeInput('insertText', event.data).forEach(send);
+			input.value = '';
+		};
+		const onInput = () => {
+			if (composing) return;
+			const value = input.value;
+			input.value = '';
+			if ((value === ' ' || value === '\u00a0') && Date.now() - lastSpaceAt >= 80) {
+				send({ kind: 'key', down: true, code: 'Space', ctrl: false, alt: false, shift: false, meta: false });
+				send({ kind: 'key', down: false, code: 'Space', ctrl: false, alt: false, shift: false, meta: false });
+			}
+		};
+		window.addEventListener('keydown', onDown, true);
+		window.addEventListener('keyup', onUp, true);
+		input.addEventListener('beforeinput', onBeforeInput);
+		input.addEventListener('compositionstart', onCompositionStart);
+		input.addEventListener('compositionend', onCompositionEnd);
+		input.addEventListener('input', onInput);
+		input.addEventListener('blur', releaseHeld);
+		return () => {
+			window.removeEventListener('keydown', onDown, true);
+			window.removeEventListener('keyup', onUp, true);
+			input.removeEventListener('beforeinput', onBeforeInput);
+			input.removeEventListener('compositionstart', onCompositionStart);
+			input.removeEventListener('compositionend', onCompositionEnd);
+			input.removeEventListener('input', onInput);
+			input.removeEventListener('blur', releaseHeld);
+			releaseHeld();
+		};
+	}, [streamUrl, onViewerKey]);
+
 	// @ts-ignore
 	return (
 		<div
@@ -267,6 +381,29 @@ function PlayerView(props: PlayerViewProps) {
 					)}
 				</div>
 				<canvas id={COMPARISON_CANVAS_ID} style={{ display: 'none' }}></canvas>
+				{streamUrl ? <textarea
+					ref={keyInputRef}
+					aria-label="keyboard"
+					autoCapitalize="off"
+					autoCorrect="off"
+					spellCheck={false}
+					style={{
+						position: 'absolute',
+						top: 0,
+						right: 0,
+						bottom: 0,
+						left: 0,
+						zIndex: 1,
+						margin: 0,
+						padding: 0,
+						border: 0,
+						resize: 'none',
+						fontSize: 16,
+						color: 'transparent',
+						background: 'transparent',
+						caretColor: 'transparent',
+					}}
+				/> : null}
 			</div>
 		</div>
 	);

@@ -1,4 +1,5 @@
 import DesktopCapturerSourceType from '../../../../common/DesktopCapturerSourceType';
+import { IpcEvents } from '../../../../common/IpcEvents.enum';
 import getDesktopSourceStreamBySourceID from './getDesktopSourceStreamBySourceID';
 import prepareDataMessageToSendScreenSourceType from './prepareDataMessageToSendScreenSourceType';
 import NullSimplePeer from './NullSimplePeer';
@@ -52,6 +53,15 @@ export default async function handlePeerOnData(
 
 		// update local stream reference to new stream
 		peerConnection.localStream = newStream;
+	}
+
+	if (dataJSON.type === 'viewer_key') {
+		window.electron.ipcRenderer.invoke(
+			IpcEvents.InjectWindowKey,
+			peerConnection.desktopCapturerSourceID,
+			dataJSON.payload,
+		);
+		return;
 	}
 
 	if (dataJSON.type === 'get_sharing_source_type') {

@@ -30,6 +30,7 @@ import {
 	stopWindowAudioDelay,
 	syncWindowAudioDelay,
 } from '../windowAudioDelay/windowAudioDelayController';
+import { postViewerKey } from '../windowInput/postViewerKey';
 
 export const initIpcMainHandlers = (mainWindow: BrowserWindow): void => {
 	installWindowAudioDelayLifecycle();
@@ -40,6 +41,10 @@ export const initIpcMainHandlers = (mainWindow: BrowserWindow): void => {
 
 	ipcMain.handle(IpcEvents.SetWindowAudioDelayMs, (_, value) => {
 		return setWindowAudioDelayMs(Number(value));
+	});
+
+	ipcMain.handle(IpcEvents.InjectWindowKey, (_, sourceId: string, payload: unknown) => {
+		postViewerKey(sourceId, payload);
 	});
 
 	ipcMain.on('client-changed-language', async (_, newLangCode) => {

@@ -35,4 +35,5 @@ export enum IpcEvents {
 	RelaunchApp = 'relaunch-app',
 	GetWindowAudioDelayMs = 'get-window-audio-delay-ms',
 	SetWindowAudioDelayMs = 'set-window-audio-delay-ms',
+	InjectWindowKey = 'inject-window-key',
 }
