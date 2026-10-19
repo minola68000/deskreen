@@ -1,5 +1,13 @@
 # Deskreen CE (Community Edition)
 
+This repository is a fork of [pavlobu/deskreen](https://github.com/pavlobu/deskreen). It is not an upstream release. The `master` branch adds:
+
+- Capture a window even when another window covers it
+- Send only a selected area of a shared window
+- Forward keyboard input from the viewer to the shared window
+- Delay audio from the shared window
+- Let a viewer on the same LAN join the waiting room, and keep the picture moving past the first frame
+
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20MacOS%20%7C%20Linux-lightgrey)
 (Over 2M downloads during 5 years since launch)
 
