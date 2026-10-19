@@ -1,7 +1,7 @@
 import { join } from 'path';
 import { BrowserWindow } from 'electron';
-import { is } from '@electron-toolkit/utils';
 import { existsSync } from 'node:fs';
+import { peerHelperWindowOptions } from './peerHelperWindowOptions';
 
 type RendererHelperWebcontentsID = number;
 
@@ -30,7 +30,7 @@ export default class RendererWebrtcHelpersService {
 		let helperRendererWindow: BrowserWindow | null = null;
 
 		helperRendererWindow = new BrowserWindow({
-			show: is.dev, // show in dev only
+			...peerHelperWindowOptions(),
 			webPreferences: {
 				preload: this.resolvePreloadScriptPath('helperRenderer'),
 				// contextIsolation: true,
