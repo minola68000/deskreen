@@ -16,6 +16,8 @@ import { Device } from '../../../../common/Device';
 import { LocalPeerUser } from '../../../../common/LocalPeerUser';
 import type { SendEncryptedMessagePayload } from '../../../../common/SendEncryptedMessagePayload';
 import { Socket } from 'socket.io-client';
+import { clampCrop, type CaptureCrop } from '../../../../common/captureCrop';
+import { cropMediaStream } from './cropMediaStream';
 
 type DisplaySize = { width: number; height: number };
 
@@ -31,6 +33,7 @@ export default class PeerConnection {
 	partner: PartnerPeerUser;
 	peer = NullSimplePeer;
 	desktopCapturerSourceID: string;
+	captureCrop: CaptureCrop | null;
 	localStream: MediaStream | null;
 	isSocketRoomLocked: boolean;
 	partnerDeviceDetails = {
@@ -63,6 +66,7 @@ export default class PeerConnection {
 		this.user = user;
 		this.partner = NullUser;
 		this.desktopCapturerSourceID = '';
+		this.captureCrop = null;
 		this.signalsDataToCallUser = [];
 		this.isCallStarted = false;
 		this.localStream = null;
@@ -89,6 +93,10 @@ export default class PeerConnection {
 				},
 			});
 		}, 1000);
+	}
+
+	setCaptureCrop(crop: unknown): void {
+		this.captureCrop = clampCrop(crop);
 	}
 
 	async setDesktopCapturerSourceID(id: string): Promise<void> {
@@ -148,13 +156,16 @@ export default class PeerConnection {
 					return;
 				}
 
-				const newStream = await getDesktopSourceStreamBySourceID(
+				const captured = await getDesktopSourceStreamBySourceID(
 					this.desktopCapturerSourceID,
 					this.sourceDisplaySize?.width,
 					this.sourceDisplaySize?.height,
 					0.5,
 					1,
 				);
+				const newStream = this.captureCrop
+					? await cropMediaStream(captured, this.captureCrop)
+					: captured;
 				const newVideoTrack = newStream.getVideoTracks()[0];
 
 				if (!newVideoTrack) {

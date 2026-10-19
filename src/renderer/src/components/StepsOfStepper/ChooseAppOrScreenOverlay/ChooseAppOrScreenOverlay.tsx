@@ -4,6 +4,8 @@ import { Row, Col } from 'react-flexbox-grid';
 import { createStyles, makeStyles } from '@material-ui/core/styles';
 import CloseOverlayButton from '../../CloseOverlayButton';
 import PreviewGridList from './PreviewGridList';
+import WindowCropPicker from './WindowCropPicker';
+import type { CaptureCrop } from '../../../../../common/captureCrop';
 import { IpcEvents } from '../../../../../common/IpcEvents.enum';
 import { useTranslation } from 'react-i18next';
 
@@ -56,6 +58,7 @@ export default function ChooseAppOrScreenOverlay(
 
 	const [viewSharingIds, setViewSharingIds] = useState<string[]>([]);
 	const [isLoading, setIsLoading] = useState<boolean>(false);
+	const [cropSourceId, setCropSourceId] = useState<string | null>(null);
 
 	const handleRefreshSources = useCallback(async (): Promise<string[]> => {
 		if (isWaylandSession) {
@@ -88,6 +91,7 @@ export default function ChooseAppOrScreenOverlay(
 		if (!isChooseAppOrScreenOverlayOpen || isWaylandSession) {
 			setIsLoading(false);
 			setViewSharingIds([]);
+			setCropSourceId(null);
 			return;
 		}
 
@@ -219,7 +223,21 @@ export default function ChooseAppOrScreenOverlay(
 						minHeight: '400px',
 					}}
 				>
-					{isLoading ? (
+					{cropSourceId ? (
+						<WindowCropPicker
+							sourceId={cropSourceId}
+							onCancel={() => setCropSourceId(null)}
+							onConfirm={(crop: CaptureCrop | null) => {
+								window.electron.ipcRenderer.invoke(
+									IpcEvents.SetDesktopCapturerSourceId,
+									cropSourceId,
+									crop,
+								);
+								handleNextApplicationWindow();
+								handleClose();
+							}}
+						/>
+					) : isLoading ? (
 						<div
 							style={{
 								position: 'absolute',
@@ -256,6 +274,7 @@ export default function ChooseAppOrScreenOverlay(
 											handleNextApplicationWindow();
 											handleClose();
 										}}
+										onSelectWindow={setCropSourceId}
 									/>
 								</div>
 							</Row>

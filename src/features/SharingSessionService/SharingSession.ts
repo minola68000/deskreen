@@ -23,6 +23,7 @@ export default class SharingSession {
 	peerConnectionHelperRenderer: BrowserWindow | undefined;
 	onDeviceConnectedCallback: undefined | ((device: Device) => void);
 	desktopCapturerSourceID: string;
+	captureCrop: { x: number; y: number; width: number; height: number } | null;
 	localUser: LocalPeerUser;
 	helperRendererService: PeerConnectionHelperRendererService;
 	reannounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -44,6 +45,7 @@ export default class SharingSession {
 		this.status = SharingSessionStatusEnum.NOT_CONNECTED;
 		this.statusChangeListeners = [] as SharingSessionStatusChangeListener[];
 		this.desktopCapturerSourceID = '';
+		this.captureCrop = null;
 		this.onDeviceConnectedCallback = undefined;
 		this.localUser = user;
 		this.helperRendererService = peerConnectionHelperRendererService;
@@ -159,12 +161,17 @@ export default class SharingSession {
 		this.onDeviceConnectedCallback = callback;
 	}
 
-	setDesktopCapturerSourceID(id: string): void {
+	setDesktopCapturerSourceID(
+		id: string,
+		crop: { x: number; y: number; width: number; height: number } | null = null,
+	): void {
 		this.desktopCapturerSourceID = id;
+		this.captureCrop = crop;
 		if (process.env.RUN_MODE === 'test') return;
 		this.peerConnectionHelperRenderer?.webContents.send(
 			'set-desktop-capturer-source-id',
 			id,
+			crop,
 		);
 	}
 

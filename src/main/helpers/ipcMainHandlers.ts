@@ -21,6 +21,7 @@ import { IpcEvents } from '../../common/IpcEvents.enum';
 import { ElectronStoreKeys } from '../../common/ElectronStoreKeys.enum';
 import { store } from '../../common/deskreen-electron-store';
 import DesktopCapturerSourceType from '../../common/DesktopCapturerSourceType';
+import { clampCrop } from '../../common/captureCrop';
 import isLinuxWaylandSession from '../utils/isLinuxWaylandSession';
 import { checkScreenRecordingPermission } from './checkScreenRecordingPermission';
 import {
@@ -465,9 +466,10 @@ export const initIpcMainHandlers = (mainWindow: BrowserWindow): void => {
 		},
 	);
 
-	ipcMain.handle(IpcEvents.SetDesktopCapturerSourceId, (_, id) => {
+	ipcMain.handle(IpcEvents.SetDesktopCapturerSourceId, (_, id: string, crop?: unknown) => {
 		getDeskreenGlobal().sharingSessionService.waitingForConnectionSharingSession?.setDesktopCapturerSourceID(
 			id,
+			clampCrop(crop),
 		);
 	});
 

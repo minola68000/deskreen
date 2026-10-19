@@ -1,5 +1,6 @@
 import getDesktopSourceStreamBySourceID from './getDesktopSourceStreamBySourceID';
 import DesktopCapturerSourceType from '../../../../common/DesktopCapturerSourceType';
+import { cropMediaStream } from './cropMediaStream';
 
 export default async function createDesktopCapturerStream(
 	peerConnection: PeerConnection,
@@ -8,19 +9,18 @@ export default async function createDesktopCapturerStream(
 	try {
 		if (process.env.RUN_MODE === 'test') return;
 
-		if (sourceID.includes(DesktopCapturerSourceType.SCREEN)) {
-			const stream = await getDesktopSourceStreamBySourceID(
-				sourceID,
-				peerConnection.sourceDisplaySize?.width,
-				peerConnection.sourceDisplaySize?.height,
-				0.5,
-				1,
-			);
-			peerConnection.localStream = stream;
-		} else {
-			const stream = await getDesktopSourceStreamBySourceID(sourceID);
-			peerConnection.localStream = stream;
-		}
+		const stream = sourceID.includes(DesktopCapturerSourceType.SCREEN)
+			? await getDesktopSourceStreamBySourceID(
+					sourceID,
+					peerConnection.sourceDisplaySize?.width,
+					peerConnection.sourceDisplaySize?.height,
+					0.5,
+					1,
+				)
+			: await getDesktopSourceStreamBySourceID(sourceID);
+		peerConnection.localStream = peerConnection.captureCrop
+			? await cropMediaStream(stream, peerConnection.captureCrop)
+			: stream;
 	} catch (e) {
 		console.error(e);
 	}

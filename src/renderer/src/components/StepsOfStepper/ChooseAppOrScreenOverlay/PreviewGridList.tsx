@@ -7,6 +7,7 @@ interface PreviewGridListProps {
 	isEntireScreen: boolean;
 	handleNextEntireScreen: () => void;
 	handleNextApplicationWindow: () => void;
+	onSelectWindow: (sourceId: string) => void;
 }
 
 export default function PreviewGridList(props: PreviewGridListProps) {
@@ -14,7 +15,7 @@ export default function PreviewGridList(props: PreviewGridListProps) {
 		viewSharingIds,
 		isEntireScreen,
 		handleNextEntireScreen,
-		handleNextApplicationWindow,
+		onSelectWindow,
 	} = props;
 
 	return (
@@ -32,15 +33,15 @@ export default function PreviewGridList(props: PreviewGridListProps) {
 							sharingSourceID={id}
 							isChangeAppearanceOnHover
 							onClickCard={async () => {
+								if (!isEntireScreen) {
+									onSelectWindow(id);
+									return;
+								}
 								window.electron.ipcRenderer.invoke(
 									IpcEvents.SetDesktopCapturerSourceId,
 									id,
 								);
-								if (isEntireScreen) {
-									handleNextEntireScreen();
-								} else {
-									handleNextApplicationWindow();
-								}
+								handleNextEntireScreen();
 							}}
 						/>
 					</Col>
