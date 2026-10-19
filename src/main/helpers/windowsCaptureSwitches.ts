@@ -1,8 +1,5 @@
-const WINDOWS_WGC_FEATURES = [
-	'AllowWgcScreenCapturer',
-	'AllowWgcWindowCapturer',
-];
-
+const SCREEN_CAPTURE_FEATURE = 'AllowWgcScreenCapturer';
+const WINDOW_CAPTURE_FEATURE = 'AllowWgcWindowCapturer';
 const LAN_CANDIDATE_FEATURE = 'WebRtcHideLocalIpsWithMdns';
 
 export function chromiumFeaturesDisablingBrokenWgc(
@@ -10,7 +7,7 @@ export function chromiumFeaturesDisablingBrokenWgc(
 ): string | null {
 	const features = [LAN_CANDIDATE_FEATURE];
 	if (platform === 'win32') {
-		features.unshift(...WINDOWS_WGC_FEATURES);
+		features.unshift(SCREEN_CAPTURE_FEATURE);
 	}
 	return features.join(',');
 }
@@ -28,7 +25,14 @@ export function argvWithBrokenWgcDisabled(
 			.split(',')
 			.filter(Boolean),
 	);
-	if (required.every((feature) => present.has(feature))) return null;
+	const windowCapturerDisabled = present.has(WINDOW_CAPTURE_FEATURE);
+	present.delete(WINDOW_CAPTURE_FEATURE);
+	if (
+		!windowCapturerDisabled &&
+		required.every((feature) => present.has(feature))
+	) {
+		return null;
+	}
 	for (const feature of required) present.add(feature);
 	const kept = argv
 		.slice(1)
