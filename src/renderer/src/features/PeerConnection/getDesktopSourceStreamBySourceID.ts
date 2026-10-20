@@ -1,4 +1,5 @@
 import { viewerSafeCaptureSize } from './viewerSafeCaptureSize';
+import { cursorCaptureMode } from '../../../../common/shareMouseCursor';
 
 async function getStreamWithSource(
 	chromeMediaSource: 'desktop' | 'screen',
@@ -9,6 +10,7 @@ async function getStreamWithSource(
 	maxSizeMultiplier: number,
 	minFrameRate: number,
 	maxFrameRate: number,
+	includeCursor: boolean,
 ): Promise<MediaStream> {
 	const maxSize = viewerSafeCaptureSize(
 		width ? width * maxSizeMultiplier : undefined,
@@ -18,12 +20,14 @@ async function getStreamWithSource(
 		width && height
 			? viewerSafeCaptureSize(width * minSizeMultiplier, height * minSizeMultiplier)
 			: maxSize;
+	const cursor = cursorCaptureMode(includeCursor);
 
 	if (width && height) {
 		return navigator.mediaDevices.getUserMedia({
 			audio: false,
 			video: {
-				// @ts-ignore: mandatory is supported in chromium but missing in types
+				// @ts-ignore: mandatory/cursor are supported in chromium but missing in types
+				cursor,
 				mandatory: {
 					chromeMediaSource,
 					chromeMediaSourceId: sourceID,
@@ -41,7 +45,8 @@ async function getStreamWithSource(
 	return navigator.mediaDevices.getUserMedia({
 		audio: false,
 		video: {
-			// @ts-ignore: mandatory is supported in chromium but missing in types
+			// @ts-ignore: mandatory/cursor are supported in chromium but missing in types
+			cursor,
 			mandatory: {
 				chromeMediaSource,
 				chromeMediaSourceId: sourceID,
@@ -62,6 +67,7 @@ export default async (
 	maxSizeMultiplier = 1,
 	minFrameRate = 15,
 	maxFrameRate = 30,
+	includeCursor = true,
 ): Promise<MediaStream> => {
 	try {
 		return await getStreamWithSource(
@@ -73,6 +79,7 @@ export default async (
 			maxSizeMultiplier,
 			minFrameRate,
 			maxFrameRate,
+			includeCursor,
 		);
 	} catch (desktopError) {
 		console.warn(
@@ -88,6 +95,7 @@ export default async (
 			maxSizeMultiplier,
 			minFrameRate,
 			maxFrameRate,
+			includeCursor,
 		);
 	}
 };

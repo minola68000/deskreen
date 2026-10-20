@@ -30,6 +30,7 @@ export default async function handlePeerOnData(
 			maxVideoQualityMultiplier,
 			30,
 			30,
+			peerConnection.shareMouseCursor,
 		);
 		const newVideoTrack = newStream.getVideoTracks()[0];
 		const oldStream = peerConnection.localStream;

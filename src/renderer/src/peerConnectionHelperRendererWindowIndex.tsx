@@ -60,6 +60,11 @@ export function handleIpcRenderer(): void {
 					data.user,
 					port,
 				);
+				peerConnection.shareMouseCursor = Boolean(
+					await window.electron.ipcRenderer.invoke(
+						IpcEvents.GetShareMouseCursor,
+					),
+				);
 
 				peerConnection.setOnDeviceConnectedCallback((deviceData) => {
 					window.electron.ipcRenderer.send('peer-connected', deviceData);
@@ -69,10 +74,24 @@ export function handleIpcRenderer(): void {
 
 		window.electron.ipcRenderer.on(
 			'set-desktop-capturer-source-id',
-			(_, id, crop) => {
+			async (_, id, crop) => {
 				if (peerConnection) {
+					peerConnection.shareMouseCursor = Boolean(
+						await window.electron.ipcRenderer.invoke(
+							IpcEvents.GetShareMouseCursor,
+						),
+					);
 					peerConnection.setCaptureCrop(crop);
 					peerConnection.setDesktopCapturerSourceID(id);
+				}
+			},
+		);
+
+		window.electron.ipcRenderer.on(
+			'set-share-mouse-cursor',
+			(_, include: boolean) => {
+				if (peerConnection) {
+					void peerConnection.setShareMouseCursor(include);
 				}
 			},
 		);

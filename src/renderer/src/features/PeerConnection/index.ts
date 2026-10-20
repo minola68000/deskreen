@@ -33,6 +33,7 @@ export default class PeerConnection {
 	partner: PartnerPeerUser;
 	peer = NullSimplePeer;
 	desktopCapturerSourceID: string;
+	shareMouseCursor: boolean;
 	captureCrop: CaptureCrop | null;
 	localStream: MediaStream | null;
 	isSocketRoomLocked: boolean;
@@ -66,6 +67,7 @@ export default class PeerConnection {
 		this.user = user;
 		this.partner = NullUser;
 		this.desktopCapturerSourceID = '';
+		this.shareMouseCursor = true;
 		this.captureCrop = null;
 		this.signalsDataToCallUser = [];
 		this.isCallStarted = false;
@@ -97,6 +99,12 @@ export default class PeerConnection {
 
 	setCaptureCrop(crop: unknown): void {
 		this.captureCrop = clampCrop(crop);
+	}
+
+	async setShareMouseCursor(include: boolean): Promise<void> {
+		this.shareMouseCursor = include;
+		if (!this.desktopCapturerSourceID || !this.localStream) return;
+		await this.handleCreatePeerAfterDesktopCapturerSourceIDWasSet();
 	}
 
 	async setDesktopCapturerSourceID(id: string): Promise<void> {
@@ -162,6 +170,9 @@ export default class PeerConnection {
 					this.sourceDisplaySize?.height,
 					0.5,
 					1,
+					15,
+					30,
+					this.shareMouseCursor,
 				);
 				const newStream = this.captureCrop
 					? await cropMediaStream(captured, this.captureCrop)

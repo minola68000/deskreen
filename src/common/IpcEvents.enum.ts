@@ -35,5 +35,7 @@ export enum IpcEvents {
 	RelaunchApp = 'relaunch-app',
 	GetWindowAudioDelayMs = 'get-window-audio-delay-ms',
 	SetWindowAudioDelayMs = 'set-window-audio-delay-ms',
+	GetShareMouseCursor = 'get-share-mouse-cursor',
+	SetShareMouseCursor = 'set-share-mouse-cursor',
 	InjectWindowKey = 'inject-window-key',
 }

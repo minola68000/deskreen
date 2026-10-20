@@ -22,6 +22,7 @@ import { ElectronStoreKeys } from '../../common/ElectronStoreKeys.enum';
 import { store } from '../../common/deskreen-electron-store';
 import DesktopCapturerSourceType from '../../common/DesktopCapturerSourceType';
 import { clampCrop } from '../../common/captureCrop';
+import { normalizeShareMouseCursor } from '../../common/shareMouseCursor';
 import isLinuxWaylandSession from '../utils/isLinuxWaylandSession';
 import { checkScreenRecordingPermission } from './checkScreenRecordingPermission';
 import {
@@ -33,6 +34,27 @@ import {
 } from '../windowAudioDelay/windowAudioDelayController';
 import { postViewerKey } from '../windowInput/postViewerKey';
 
+function readShareMouseCursor(): boolean {
+	if (!store.has(ElectronStoreKeys.ShareMouseCursor)) {
+		return true;
+	}
+	return normalizeShareMouseCursor(store.get(ElectronStoreKeys.ShareMouseCursor));
+}
+
+function broadcastShareMouseCursor(include: boolean): void {
+	const { sharingSessionService } = getDeskreenGlobal();
+	sharingSessionService.sharingSessions.forEach((session) => {
+		session.peerConnectionHelperRenderer?.webContents.send(
+			'set-share-mouse-cursor',
+			include,
+		);
+	});
+	sharingSessionService.waitingForConnectionSharingSession?.peerConnectionHelperRenderer?.webContents.send(
+		'set-share-mouse-cursor',
+		include,
+	);
+}
+
 export const initIpcMainHandlers = (mainWindow: BrowserWindow): void => {
 	installWindowAudioDelayLifecycle();
 
@@ -42,6 +64,17 @@ export const initIpcMainHandlers = (mainWindow: BrowserWindow): void => {
 
 	ipcMain.handle(IpcEvents.SetWindowAudioDelayMs, (_, value) => {
 		return setWindowAudioDelayMs(Number(value));
+	});
+
+	ipcMain.handle(IpcEvents.GetShareMouseCursor, () => {
+		return readShareMouseCursor();
+	});
+
+	ipcMain.handle(IpcEvents.SetShareMouseCursor, (_, value: unknown) => {
+		const include = normalizeShareMouseCursor(value);
+		store.set(ElectronStoreKeys.ShareMouseCursor, include);
+		broadcastShareMouseCursor(include);
+		return include;
 	});
 
 	ipcMain.handle(IpcEvents.InjectWindowKey, (_, sourceId: string, payload: unknown) => {

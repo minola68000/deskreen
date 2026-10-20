@@ -82,6 +82,7 @@ export default function SettingsOverlay(
 	const [delayMs, setDelayMs] = useState('0');
 	const [delayError, setDelayError] = useState('');
 	const delayLoaded = React.useRef(false);
+	const [shareMouseCursor, setShareMouseCursor] = useState(true);
 
 	const { t } = useTranslation();
 
@@ -150,6 +151,11 @@ export default function SettingsOverlay(
 				setDelayError(state.error || '');
 				delayLoaded.current = true;
 			});
+		void window.electron.ipcRenderer
+			.invoke(IpcEvents.GetShareMouseCursor)
+			.then((include: boolean) => {
+				setShareMouseCursor(Boolean(include));
+			});
 	}, []);
 
 	useEffect(() => {
@@ -208,6 +214,39 @@ export default function SettingsOverlay(
 						label={t('language')}
 						input={<LanguageSelector />}
 					/>
+				</div>
+
+				<div style={{ marginTop: '24px', width: '100%' }}>
+					<Row middle="xs" between="xs">
+						<Col xs={8}>
+							<Text>{t('share-mouse-cursor')}</Text>
+						</Col>
+						<Col xs={4}>
+							<label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+								<input
+									type="checkbox"
+									checked={shareMouseCursor}
+									aria-label={t('share-mouse-cursor')}
+									onChange={(
+										event: React.ChangeEvent<HTMLInputElement>,
+									) => {
+										const include = event.target.checked;
+										setShareMouseCursor(include);
+										void window.electron.ipcRenderer.invoke(
+											IpcEvents.SetShareMouseCursor,
+											include,
+										);
+									}}
+								/>
+								<Text>
+									{shareMouseCursor
+										? t('share-mouse-cursor-on')
+										: t('share-mouse-cursor-off')}
+								</Text>
+							</label>
+						</Col>
+					</Row>
+					<Text className="bp3-text-muted">{t('share-mouse-cursor-hint')}</Text>
 				</div>
 
 				<div style={{ marginTop: '24px', width: '100%' }}>
