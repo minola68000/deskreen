@@ -9,6 +9,7 @@ const POSTER_SCRIPT = `
 $ErrorActionPreference = 'Stop'
 Add-Type -TypeDefinition @"
 using System;
+using System.Collections.Generic;
 using System.Text;
 using System.Runtime.InteropServices;
 public static class DeskKey {
@@ -36,6 +37,19 @@ public static class DeskKey {
   public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
   [DllImport("user32.dll")]
   public static extern bool GetGUIThreadInfo(uint threadId, ref GUI info);
+  public delegate bool EnumProc(IntPtr hwnd, IntPtr lParam);
+  [DllImport("user32.dll")]
+  public static extern bool EnumWindows(EnumProc proc, IntPtr lParam);
+  [DllImport("user32.dll")]
+  public static extern bool SetWindowPos(IntPtr hWnd, IntPtr insertAfter, int x, int y, int cx, int cy, uint flags);
+  [DllImport("user32.dll")]
+  public static extern bool IsWindow(IntPtr hWnd);
+  [DllImport("user32.dll")]
+  public static extern IntPtr GetDesktopWindow();
+  [DllImport("user32.dll")]
+  public static extern IntPtr GetShellWindow();
+  [DllImport("user32.dll", EntryPoint = "GetWindowLong")]
+  public static extern int GetWindowLong(IntPtr hWnd, int index);
   [StructLayout(LayoutKind.Sequential)]
   public struct RECT { public int Left, Top, Right, Bottom; }
   [StructLayout(LayoutKind.Sequential)]
@@ -125,6 +139,35 @@ public static class DeskKey {
     if (targetThread != 0 && targetThread != foreThread) AttachThreadInput(current, targetThread, false);
     if (foreThread != 0) AttachThreadInput(current, foreThread, false);
   }
+  static List<IntPtr> zOrder;
+  static EnumProc zEnum;
+  static bool Collect(IntPtr hwnd, IntPtr lParam) {
+    zOrder.Add(hwnd);
+    return true;
+  }
+  public static IntPtr[] Snapshot() {
+    zOrder = new List<IntPtr>();
+    if (zEnum == null) zEnum = Collect;
+    EnumWindows(zEnum, IntPtr.Zero);
+    return zOrder.ToArray();
+  }
+  static bool Skip(IntPtr hwnd) {
+    if (hwnd == GetDesktopWindow() || hwnd == GetShellWindow()) return true;
+    StringBuilder name = new StringBuilder(256);
+    GetClassName(hwnd, name, 256);
+    string cls = name.ToString();
+    return cls == "Progman" || cls == "WorkerW";
+  }
+  public static void Restore(IntPtr[] order) {
+    uint flags = 0x0001 | 0x0002 | 0x0010 | 0x0200;
+    for (int i = order.Length - 1; i >= 0; i--) {
+      IntPtr hwnd = order[i];
+      if (!IsWindow(hwnd) || Skip(hwnd)) continue;
+      int ex = GetWindowLong(hwnd, -20);
+      IntPtr insert = (ex & 8) != 0 ? new IntPtr(-1) : IntPtr.Zero;
+      SetWindowPos(hwnd, insert, 0, 0, 0, 0, flags);
+    }
+  }
   public static void TypeKey(int msg, long wParam, long lParam) {
     INPUT input = new INPUT();
     input.type = 1;
@@ -154,6 +197,7 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
   if ($parts.Length -lt 2) { continue }
   $root = [IntPtr]([int64]$parts[0])
   $target = [DeskKey]::Target([int64]$parts[0])
+  $order = [DeskKey]::Snapshot()
   $previous = [DeskKey]::GetForegroundWindow()
   [DeskKey]::Activate($root, $target)
   foreach ($item in $parts[1].Split(';')) {
@@ -168,6 +212,7 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
     }
   }
   Start-Sleep -Milliseconds 30
+  [DeskKey]::Restore($order)
   if ($previous -ne [IntPtr]::Zero -and $previous -ne $root) {
     [DeskKey]::Activate($previous, $previous)
   }
