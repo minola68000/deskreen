@@ -4,6 +4,7 @@ import { createStyles, makeStyles } from '@material-ui/core/styles';
 import { Col, Row } from 'react-flexbox-grid';
 import SettingsOverlay from './SettingsOverlay/SettingsOverlay';
 import ConnectedDevicesListDrawer from './ConnectedDevicesListDrawer';
+import ChangeSharingSourceButton from './ChangeSharingSourceButton';
 import { useTranslation } from 'react-i18next';
 import { IpcEvents } from '../../../common/IpcEvents.enum';
 
@@ -352,6 +353,11 @@ export default function TopPanel({ handleReset }: Props): React.ReactElement {
 				<div className={classes.topPanelControlsWrapper}>
 					<div className={classes.topPanelControlButtonsRoot}>
 						{renderConnectedDevicesListButton}
+						{connectedDevicesCount > 0 ? (
+							<div className={classes.topPanelControlButtonMargin}>
+								<ChangeSharingSourceButton />
+							</div>
+						) : null}
 						{renderHelpButton}
 						{renderTutorialButton}
 						{renderSettingsButton}

@@ -14,6 +14,7 @@ import { createStyles, makeStyles } from '@material-ui/core/styles';
 import CloseOverlayButton from './CloseOverlayButton';
 import DeviceInfoCallout from './DeviceInfoCallout';
 import SharingSourcePreviewCard from './SharingSourcePreviewCard';
+import ChangeSharingSourceButton from './ChangeSharingSourceButton';
 import { Device } from '../../../common/Device';
 import { IpcEvents } from '../../../common/IpcEvents.enum';
 import isProduction from '../../../common/isProduction';
@@ -57,35 +58,34 @@ export default function ConnectedDevicesListDrawer(
 	>([]);
 	const [devicesDisplayed, setDevicesDisplayed] = useState(new Map());
 
-	useEffect(() => {
-		function getConnectedDevicesCallback() {
-			window.electron.ipcRenderer
-				.invoke(IpcEvents.GetConnectedDevices)
-				.then(async (devices: Device[]) => {
-					const devicesWithSourceIds: DeviceWithDesktopCapturerSourceId[] = [];
+	const getConnectedDevicesCallback = useCallback(() => {
+		window.electron.ipcRenderer
+			.invoke(IpcEvents.GetConnectedDevices)
+			.then(async (devices: Device[]) => {
+				const devicesWithSourceIds: DeviceWithDesktopCapturerSourceId[] = [];
 
-					for await (const device of devices) {
-						const sharingSourceId = await window.electron.ipcRenderer.invoke(
-							IpcEvents.GetDesktopCapturerSourceIdBySharingSessionId,
-							device.sharingSessionID,
-						);
-						devicesWithSourceIds.push({
-							...device,
-							desktopCapturerSourceId: sharingSourceId,
-						});
-					}
-					setConnectedDevices(devicesWithSourceIds);
-
-					const map = new Map();
-					devicesWithSourceIds.forEach((el) => {
-						map.set(el.id, true);
+				for await (const device of devices) {
+					const sharingSourceId = await window.electron.ipcRenderer.invoke(
+						IpcEvents.GetDesktopCapturerSourceIdBySharingSessionId,
+						device.sharingSessionID,
+					);
+					devicesWithSourceIds.push({
+						...device,
+						desktopCapturerSourceId: sharingSourceId,
 					});
-					setDevicesDisplayed(map);
-				})
+				}
+				setConnectedDevices(devicesWithSourceIds);
 
-				.catch((e) => console.error(e));
-		}
+				const map = new Map();
+				devicesWithSourceIds.forEach((el) => {
+					map.set(el.id, true);
+				});
+				setDevicesDisplayed(map);
+			})
+			.catch((e) => console.error(e));
+	}, []);
 
+	useEffect(() => {
 		getConnectedDevicesCallback();
 
 		const connectedDevicesInterval = setInterval(
@@ -96,7 +96,7 @@ export default function ConnectedDevicesListDrawer(
 		return () => {
 			clearInterval(connectedDevicesInterval);
 		};
-	}, []);
+	}, [getConnectedDevicesCallback]);
 
 	const handleDisconnectOneDevice = useCallback(
 		async (id: string) => {
@@ -191,6 +191,10 @@ export default function ConnectedDevicesListDrawer(
 							<div className={classes.topHeader}>
 								<Text className="bp3-text-muted">{t('connected-devices')}</Text>
 							</div>
+							<ChangeSharingSourceButton
+								disabled={connectedDevices.length === 0}
+								onChanged={getConnectedDevicesCallback}
+							/>
 							<Button
 								intent="danger"
 								disabled={connectedDevices.length === 0}
@@ -200,6 +204,7 @@ export default function ConnectedDevicesListDrawer(
 								icon="disable"
 								style={{
 									borderRadius: '100px',
+									marginLeft: '10px',
 								}}
 							>
 								{t('disconnect-all-devices')}

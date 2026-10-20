@@ -187,6 +187,7 @@
 	"screen-recording-permission-restart-reminder": "You must restart the app after granting Screen Recording permission for it to take effect.",
 	"screen-recording-permission-open-settings": "Open System Settings",
 	"screen-recording-permission-restart-app": "Restart App",
+	"change-shared-screen": "Change shared screen",
 	"share-mouse-cursor": "Include mouse cursor in the shared picture",
 	"share-mouse-cursor-on": "On",
 	"share-mouse-cursor-off": "Off",

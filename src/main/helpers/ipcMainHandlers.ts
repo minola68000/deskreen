@@ -22,6 +22,7 @@ import { ElectronStoreKeys } from '../../common/ElectronStoreKeys.enum';
 import { store } from '../../common/deskreen-electron-store';
 import DesktopCapturerSourceType from '../../common/DesktopCapturerSourceType';
 import { clampCrop } from '../../common/captureCrop';
+import { sessionsToUpdateForSourceChange } from '../../common/activeSharingSource';
 import { normalizeShareMouseCursor } from '../../common/shareMouseCursor';
 import isLinuxWaylandSession from '../utils/isLinuxWaylandSession';
 import { checkScreenRecordingPermission } from './checkScreenRecordingPermission';
@@ -500,10 +501,25 @@ export const initIpcMainHandlers = (mainWindow: BrowserWindow): void => {
 	);
 
 	ipcMain.handle(IpcEvents.SetDesktopCapturerSourceId, (_, id: string, crop?: unknown) => {
-		getDeskreenGlobal().sharingSessionService.waitingForConnectionSharingSession?.setDesktopCapturerSourceID(
-			id,
-			clampCrop(crop),
+		const clamped = clampCrop(crop);
+		const { sharingSessionService } = getDeskreenGlobal();
+		const waiting = sharingSessionService.waitingForConnectionSharingSession;
+		const target = sessionsToUpdateForSourceChange(
+			waiting,
+			sharingSessionService.sharingSessions.values(),
 		);
+		if (target.updateSharing) {
+			sharingSessionService.sharingSessions.forEach((session) => {
+				if (session.status === SharingSessionStatusEnum.SHARING) {
+					session.setDesktopCapturerSourceID(id, clamped);
+				}
+			});
+			syncWindowAudioDelay(id);
+			return;
+		}
+		if (target.updateWaiting) {
+			waiting?.setDesktopCapturerSourceID(id, clamped);
+		}
 	});
 
 	ipcMain.handle(IpcEvents.GetIsFirstTimeAppStart, () => {
