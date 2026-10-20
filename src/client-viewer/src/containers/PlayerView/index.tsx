@@ -16,6 +16,7 @@ import {
 import {
 	keysFromBeforeInput,
 	keysFromKeyboard,
+	textFromUserInput,
 	repeatedText,
 	viewerKeyMessage,
 	type ViewerKeyPayload,
@@ -225,6 +226,7 @@ function PlayerView(props: PlayerViewProps) {
 			onViewerKey(viewerKeyMessage(payload));
 		};
 		const onKey = (type: 'keydown' | 'keyup') => (event: KeyboardEvent) => {
+			if (composing || event.isComposing) return;
 			const payload = keysFromKeyboard(
 				type,
 				event.key,
@@ -280,30 +282,57 @@ function PlayerView(props: PlayerViewProps) {
 			keysFromBeforeInput('insertText', event.data).forEach(send);
 			input.value = '';
 		};
-		const onInput = () => {
+		const onInput = (event: Event) => {
 			if (composing) return;
+			const data = (event as InputEvent).data ?? null;
 			const value = input.value;
 			input.value = '';
-			if ((value === ' ' || value === '\u00a0') && Date.now() - lastSpaceAt >= 80) {
-				send({ kind: 'key', down: true, code: 'Space', ctrl: false, alt: false, shift: false, meta: false });
-				send({ kind: 'key', down: false, code: 'Space', ctrl: false, alt: false, shift: false, meta: false });
+			if (value === ' ' || value === '\u00a0' || data === ' ' || data === '\u00a0') {
+				if (Date.now() - lastSpaceAt >= 80) {
+					send({ kind: 'key', down: true, code: 'Space', ctrl: false, alt: false, shift: false, meta: false });
+					send({ kind: 'key', down: false, code: 'Space', ctrl: false, alt: false, shift: false, meta: false });
+				}
+				return;
 			}
+			const text = textFromUserInput(value, data);
+			if (text) send({ kind: 'text', text });
 		};
+		const onPress = (event: KeyboardEvent) => {
+			if (composing || event.isComposing) return;
+			const key = event.key && event.key.length === 1
+				? event.key
+				: String.fromCharCode(event.charCode || 0);
+			const text = textFromUserInput('', key);
+			if (!text) return;
+			event.preventDefault();
+			send({ kind: 'text', text });
+		};
+		const focusKeyInput = () => {
+			input.focus({ preventScroll: true });
+		};
+		const container = input.parentElement;
 		window.addEventListener('keydown', onDown, true);
 		window.addEventListener('keyup', onUp, true);
+		window.addEventListener('keypress', onPress, true);
 		input.addEventListener('beforeinput', onBeforeInput);
 		input.addEventListener('compositionstart', onCompositionStart);
 		input.addEventListener('compositionend', onCompositionEnd);
 		input.addEventListener('input', onInput);
+		input.addEventListener('textInput' as 'input', onInput);
 		input.addEventListener('blur', releaseHeld);
+		container?.addEventListener('pointerdown', focusKeyInput);
+		input.focus({ preventScroll: true });
 		return () => {
 			window.removeEventListener('keydown', onDown, true);
 			window.removeEventListener('keyup', onUp, true);
+			window.removeEventListener('keypress', onPress, true);
 			input.removeEventListener('beforeinput', onBeforeInput);
 			input.removeEventListener('compositionstart', onCompositionStart);
 			input.removeEventListener('compositionend', onCompositionEnd);
 			input.removeEventListener('input', onInput);
+			input.removeEventListener('textInput' as 'input', onInput);
 			input.removeEventListener('blur', releaseHeld);
+			container?.removeEventListener('pointerdown', focusKeyInput);
 			releaseHeld();
 		};
 	}, [streamUrl, onViewerKey]);
@@ -362,6 +391,7 @@ function PlayerView(props: PlayerViewProps) {
 						bottom: 0,
 						left: 0,
 						backgroundColor: '#000',
+						pointerEvents: 'none',
 					}}
 				>
 					{isWithControls ? (

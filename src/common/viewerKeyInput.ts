@@ -62,7 +62,23 @@ export function canonicalKeyCode(key: string, code: string, keyCode = 0): string
 	if (KEY_ALIASES[key]) return KEY_ALIASES[key];
 	if (NAMED_KEYS.has(key)) return key;
 	if (KEY_CODE_NUMBERS[keyCode]) return KEY_CODE_NUMBERS[keyCode];
+	if (keyCode >= 65 && keyCode <= 90) return `Key${String.fromCharCode(keyCode)}`;
+	if (keyCode >= 48 && keyCode <= 57) return `Digit${String.fromCharCode(keyCode)}`;
 	if (/^Key[A-Z]$|^Digit[0-9]$/.test(code)) return code;
+	return null;
+}
+
+function printableText(key: string, keyCode: number, shift: boolean): string | null {
+	if (key === ' ' || key === '\u00a0') return null;
+	if (key.length === 1 && !/[\u0000-\u001f\u007f]/.test(key)) return key;
+	if (keyCode >= 65 && keyCode <= 90) {
+		const letter = String.fromCharCode(keyCode);
+		return shift ? letter : letter.toLowerCase();
+	}
+	if ((keyCode >= 48 && keyCode <= 57) || (keyCode >= 96 && keyCode <= 105)) {
+		const digit = keyCode <= 57 ? keyCode : 48 + (keyCode - 96);
+		return String.fromCharCode(digit);
+	}
 	return null;
 }
 
@@ -74,6 +90,10 @@ export function keysFromKeyboard(
 	keyCode = 0,
 ): ViewerKeyPayload | null {
 	const shortcut = mods.ctrl || mods.alt || mods.meta;
+	if (!shortcut && type === 'keydown') {
+		const text = printableText(key, keyCode, mods.shift);
+		if (text) return { kind: 'text', text };
+	}
 	const canonical = canonicalKeyCode(key, code, keyCode);
 	if (!canonical) return null;
 	const characterKey = canonical === 'Enter' || canonical === 'Backspace' || /^Key[A-Z]$|^Digit[0-9]$/.test(canonical);
@@ -87,6 +107,13 @@ export function keysFromKeyboard(
 		shift: mods.shift,
 		meta: mods.meta,
 	};
+}
+
+export function textFromUserInput(value: string, data: string | null): string | null {
+	const source = data && data.length > 0 ? data : value;
+	const text = source.replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 32);
+	if (!text || text === ' ' || text === '\u00a0') return null;
+	return text;
 }
 
 export function keysFromBeforeInput(
